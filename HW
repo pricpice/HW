@@ -1,0 +1,67 @@
+/*
+	Purpose		 : Pre-processing for Beta of a Stock
+	Author		 : Chen Boyie
+	Date		 : 2020/03/22
+	Last Modified: 2020/03/14
+*/
+
+**Make Sure Working Directory is right
+pwd //Get the current working directory
+cd "/Users/user/Desktop/Stata_L2/stata file"
+
+
+// Go to Yahoo Finance for stock price data
+// https://finance.yahoo.com/quote/AAPL/history?period1=1457913600&period2=1615680000&interval=1mo&filter=history&frequency=1mo&includeAdjustedClose=true
+***Beta
+
+
+*DIS
+import delimited "data/Stock_Price/DIS.csv", clear //讀原始價格資料
+gen lopen = log(open)
+
+gen id=_n //為了做一階差分，要先設定time series資料format
+tsset id  //
+gen return_DIS=d.lopen //return可以用log price做一階差分來近似
+
+keep id return
+save "data/Stock_Price/return/DIS_return.dta", replace
+
+
+***Other Important Statistics
+* https://finance.yahoo.com/quote/%5EIRX/history?period1=1458000000&period2=1615766400&interval=1mo&filter=history&frequency=1mo&includeAdjustedClose=true
+*r_f: 13 weeks t-bill
+import delimited "data/Stock_Price/^IRX.csv", clear
+
+gen rf = open
+gen id = _n
+
+keep id rf
+save "data/Stock_Price/return/^IRX_return.dta", replace
+
+*S&P 500
+* https://www.investing.com/indices/us-spx-500-historical-data
+import delimited "data/Stock_Price/SP500.csv", clear //讀原始價格資料
+gen lopen = log(open)
+gen id=_n //為了做一階差分，要先設定time series資料format
+tsset id  //
+gen return_SP500=d.lopen //return可以用log price做一階差分來近似
+
+keep id return
+save "data/Stock_Price/return/SP500_return.dta", replace
+
+
+***In order to run a linear regression
+cd "data/Stock_Price/return/"
+
+*merge - DIS
+use "^IRX_return.dta", clear
+merge 1:m id using "DIS_return.dta"
+drop _merge
+merge 1:m id using "SP500_return.dta"
+keep rf return_DIS return_SP500
+
+**reg
+gen y = return_DIS - rf
+gen x = return_SP500 - rf
+reg y x, r
+
